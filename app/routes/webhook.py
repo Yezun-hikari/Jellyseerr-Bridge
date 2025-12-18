@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.services.downloader_client import AniWorldDownloaderClient, DownloaderClientError
+from app.security import verify_api_key
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ def get_downloader_client() -> AniWorldDownloaderClient:
     return AniWorldDownloaderClient(base_url=base_url, username=username, password=password)
 
 
-@router.post("/webhook/jellyseerr")
+@router.post("/webhook/jellyseerr", dependencies=[Depends(verify_api_key)])
 async def handle_jellyseerr_webhook(
     payload: JellyseerrWebhook,
     client: AniWorldDownloaderClient = Depends(get_downloader_client),

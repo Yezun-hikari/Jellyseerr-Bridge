@@ -34,6 +34,7 @@ This project is a Python FastAPI bridge that connects Jellyseerr to the [AniWorl
     -   `DOWNLOADER_URL`: The full URL to your AniWorld-Downloader instance (e.g., `http://aniworld-downloader:8080`).
     -   `DOWNLOADER_USER`: Your AniWorld-Downloader username.
     -   `DOWNLOADER_PASS`: Your AniWorld-Downloader password.
+    -   `BRIDGE_API_KEY`: A secret API key that you create. This is used to secure the webhook endpoint.
 
 3.  **Run with Docker Compose**
     Start the bridge service in detached mode:
@@ -43,11 +44,16 @@ This project is a Python FastAPI bridge that connects Jellyseerr to the [AniWorl
 
 ## Jellyseerr Webhook Configuration
 
+To properly emulate a Sonarr server, you need to provide the API key in a header.
+
 1.  In Jellyseerr, go to **Settings > Notifications**.
 2.  Click **Add > Webhook**.
 3.  **Webhook URL**: `http://jellyseerr-bridge:8000/webhook/jellyseerr`
-4.  **Notification Types**: Enable **Media Approved**.
-5.  Save the webhook.
+4.  Under **Custom Headers**, add a new header:
+    -   **Name**: `X-Api-Key`
+    -   **Value**: The same secret API key you set for `BRIDGE_API_KEY` in your `.env` file.
+5.  **Notification Types**: Enable **Media Approved**.
+6.  Save the webhook.
 
 ## API Endpoints
 

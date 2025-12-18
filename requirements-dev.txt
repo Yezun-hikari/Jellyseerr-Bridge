@@ -3,3 +3,4 @@ httpx
 respx
 pytest-mock
 pytest-asyncio
+fastapi
