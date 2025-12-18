@@ -6,7 +6,7 @@ services:
     container_name: jellyseerr-bridge
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "9800:8000"
     env_file:
       - .env
     networks:
