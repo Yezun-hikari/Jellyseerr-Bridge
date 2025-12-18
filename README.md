@@ -51,10 +51,14 @@ Instead of a webhook, you will now add the bridge as a Sonarr server directly in
 2.  Click **Add Sonarr Server**.
 3.  Fill in the server details:
     -   **Server Name**: `AniWorld Bridge` (or any name you prefer).
-    -   **Hostname or IP Address**: `jellyseerr-bridge` (this is the service name from `docker-compose.yml`).
+    -   **Hostname or IP Address**: `jellyseerr-bridge` (**Important**: Do NOT include `http://` or the port here. Just the service name from your `docker-compose.yml`).
     -   **Port**: `9800`
     -   **API Key**: The same secret API key you set for `BRIDGE_API_KEY` in your `.env` file.
     -   **SSL**: Leave this unchecked unless you have configured a reverse proxy with SSL.
+
+    **Example Configuration:**
+    ![Jellyseerr Setup Example](docs/jellyseerr-setup-example.jpg)
+
 4.  Click **Test**. Jellyseerr will make a few API calls to the bridge. If everything is configured correctly, you will see a "Test Successful" message.
 5.  Save the server configuration.
 
@@ -63,7 +67,8 @@ Now, when you approve an anime request in Jellyseerr, it will automatically be s
 ## Troubleshooting
 
 -   **"Test Failed" in Jellyseerr**:
-    -   Check that the `jellyseerr-bridge` container is running (`docker-compose ps`).
+    -   Double-check the **Hostname or IP Address** field in Jellyseerr. It should **only** be the container name (e.g., `jellyseerr-bridge`), not the full URL.
+    -   Check the container logs for the bridge (`docker-compose logs jellyseerr-bridge`). The new logging should show if requests are being received.
     -   Verify that the Hostname, Port, and API Key in Jellyseerr exactly match your `docker-compose.yml` and `.env` file settings.
     -   Ensure both Jellyseerr and the bridge are on the same Docker network.
 -   **Authentication Errors (502 Bad Gateway from Bridge)**: Check your `DOWNLOADER_USER` and `DOWNLOADER_PASS` credentials.
