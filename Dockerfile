@@ -20,5 +20,5 @@ COPY ./app /app/app
 # Make port 8000 available to the world outside this container
 EXPOSE 8000
 
-# Run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the application as a module to avoid PATH issues
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
