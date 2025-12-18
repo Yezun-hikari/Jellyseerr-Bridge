@@ -10,23 +10,42 @@ from app.security import verify_api_key
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Pydantic Models for Jellyseerr Webhook Payload Validation
-class Media(BaseModel):
-    name: str
-
-class Request(BaseModel):
-    seasons: List[int]
-
-class JellyseerrWebhook(BaseModel):
-    notification_type: str = Field(..., alias="notification_type")
-    media: Media
-    media_type: str = Field(..., alias="media_type")
-    request: Optional[Request] = None
-
 # API Router
-router = APIRouter()
+router = APIRouter(prefix="/api/v3", dependencies=[Depends(verify_api_key)])
 
-# Dependency to get the downloader client
+# --- Sonarr Emulation: Mock Endpoints ---
+
+@router.get("/rootfolder")
+async def get_root_folder():
+    """
+    Returns a mock root folder path. Jellyseerr requires this to connect.
+    """
+    return [{"path": "/downloads", "id": 1}]
+
+@router.get("/qualityprofile")
+async def get_quality_profile():
+    """
+    Returns a mock quality profile. Jellyseerr requires this to connect.
+    """
+    return [{"name": "Any", "id": 1}]
+
+# --- Sonarr Emulation: Core Logic Endpoint ---
+
+# Pydantic Models for Sonarr Series Payload
+class Season(BaseModel):
+    seasonNumber: int
+    monitored: bool
+
+class AddOptions(BaseModel):
+    searchForMissingEpisodes: bool
+
+class SonarrSeries(BaseModel):
+    title: str
+    seasons: List[Season]
+    addOptions: AddOptions
+
+# --- Dependency for Downloader Client ---
+
 def get_downloader_client() -> AniWorldDownloaderClient:
     """Initializes and returns an instance of the AniWorldDownloaderClient."""
     base_url = os.getenv("DOWNLOADER_URL")
@@ -41,33 +60,30 @@ def get_downloader_client() -> AniWorldDownloaderClient:
         )
     return AniWorldDownloaderClient(base_url=base_url, username=username, password=password)
 
-
-@router.post("/webhook/jellyseerr", dependencies=[Depends(verify_api_key)])
-async def handle_jellyseerr_webhook(
-    payload: JellyseerrWebhook,
+@router.post("/series")
+async def add_series(
+    payload: SonarrSeries,
     client: AniWorldDownloaderClient = Depends(get_downloader_client),
 ):
     """
-    Handles incoming webhooks from Jellyseerr.
-
-    - Validates the payload.
-    - Searches for the anime.
-    - Fetches episode list.
-    - Filters episodes based on requested seasons.
-    - Triggers the download.
+    Handles the 'add series' request from Jellyseerr, emulating Sonarr.
+    This is where the main download logic is triggered.
     """
-    logger.info(f"Received webhook notification: {payload.notification_type} for media type: {payload.media_type}")
+    # Jellyseerr might send a request to check if a series exists before adding
+    # It also sends requests for series we don't want to download immediately
+    if not payload.addOptions.searchForMissingEpisodes:
+        logger.info(f"Ignoring request for '{payload.title}' because searchForMissingEpisodes is false.")
+        return {"status": "ignored", "reason": "Not a monitored request."}
 
-    if payload.notification_type != "MEDIA_APPROVED" or payload.media_type != "anime":
-        return {"status": "ignored", "reason": "Notification is not for an approved anime request."}
+    anime_title = payload.title
+    requested_seasons = [
+        season.seasonNumber for season in payload.seasons if season.monitored
+    ]
 
-    if not payload.request or not payload.request.seasons:
-        return {"status": "ignored", "reason": "No seasons requested in the payload."}
+    if not requested_seasons:
+        return {"status": "ignored", "reason": "No seasons are monitored for download."}
 
-    anime_title = payload.media.name
-    requested_seasons = payload.request.seasons
-
-    logger.info(f"Processing approved request for '{anime_title}', seasons: {requested_seasons}")
+    logger.info(f"Processing Sonarr request for '{anime_title}', seasons: {requested_seasons}")
 
     try:
         # 1. Search for the anime

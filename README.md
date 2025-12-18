@@ -1,14 +1,15 @@
 # Jellyseerr to AniWorld-Downloader Bridge
 
-This project is a Python FastAPI bridge that connects Jellyseerr to the [AniWorld-Downloader](https://github.com/phoenixthrush/AniWorld-Downloader). It listens for webhooks from Jellyseerr and, when an anime is approved, it automatically triggers the download process via the AniWorld-Downloader API.
+This project is a Python FastAPI application that emulates a Sonarr server. Its purpose is to connect to Jellyseerr and trigger downloads via the [AniWorld-Downloader](https://github.com/phoenixthrush/AniWorld-Downloader) when an anime request is approved.
+
+By acting as a Sonarr server, it allows for a seamless, native integration with Jellyseerr.
 
 ## How It Works
 
-1.  **Jellyseerr Webhook**: When a media request is approved in Jellyseerr, it sends a webhook notification to this bridge service.
-2.  **Bridge Receives Webhook**: The bridge validates the webhook and confirms it's for an approved anime.
-3.  **Find Anime**: The bridge takes the anime title and searches for it using the AniWorld-Downloader's search API.
-4.  **Fetch Episodes**: It then fetches the list of all available episodes for the anime.
-5.  **Filter and Download**: The bridge filters the episodes to match the seasons requested in Jellyseerr and sends a request to the AniWorld-Downloader to start downloading them.
+1.  **Jellyseerr Request**: When a user requests an anime in Jellyseerr and it gets approved, Jellyseerr sends the request to this bridge, treating it as a Sonarr server.
+2.  **Bridge Emulates Sonarr**: The bridge exposes the necessary Sonarr API endpoints (`/api/v3/rootfolder`, `/api/v3/qualityprofile`, `/api/v3/series`) that Jellyseerr needs to communicate.
+3.  **Process Request**: The bridge receives the request on its `/api/v3/series` endpoint, extracts the anime title and requested seasons, and validates the request.
+4.  **Trigger Download**: It then uses the AniWorld-Downloader's API to find the anime, fetch the correct episode URLs, and start the download.
 
 ## Prerequisites
 
@@ -34,7 +35,7 @@ This project is a Python FastAPI bridge that connects Jellyseerr to the [AniWorl
     -   `DOWNLOADER_URL`: The full URL to your AniWorld-Downloader instance (e.g., `http://aniworld-downloader:8080`).
     -   `DOWNLOADER_USER`: Your AniWorld-Downloader username.
     -   `DOWNLOADER_PASS`: Your AniWorld-Downloader password.
-    -   `BRIDGE_API_KEY`: A secret API key that you create. This is used to secure the webhook endpoint.
+    -   `BRIDGE_API_KEY`: A secret API key that you create. You will need this for the Jellyseerr setup.
 
 3.  **Run with Docker Compose**
     Start the bridge service in detached mode:
@@ -42,52 +43,28 @@ This project is a Python FastAPI bridge that connects Jellyseerr to the [AniWorl
     docker-compose up -d
     ```
 
-## Jellyseerr Webhook Configuration
+## Jellyseerr Configuration
 
-To properly emulate a Sonarr server, you need to provide the API key in a header.
+Instead of a webhook, you will now add the bridge as a Sonarr server directly in Jellyseerr.
 
-1.  In Jellyseerr, go to **Settings > Notifications**.
-2.  Click **Add > Webhook**.
-3.  **Webhook URL**: `http://jellyseerr-bridge:8000/webhook/jellyseerr`
-4.  Under **Custom Headers**, add a new header:
-    -   **Name**: `X-Api-Key`
-    -   **Value**: The same secret API key you set for `BRIDGE_API_KEY` in your `.env` file.
-5.  **Notification Types**: Enable **Media Approved**.
-6.  Save the webhook.
+1.  In Jellyseerr, go to **Settings > Services**.
+2.  Click **Add Sonarr Server**.
+3.  Fill in the server details:
+    -   **Server Name**: `AniWorld Bridge` (or any name you prefer).
+    -   **Hostname or IP Address**: `jellyseerr-bridge` (this is the service name from `docker-compose.yml`).
+    -   **Port**: `9800`
+    -   **API Key**: The same secret API key you set for `BRIDGE_API_KEY` in your `.env` file.
+    -   **SSL**: Leave this unchecked unless you have configured a reverse proxy with SSL.
+4.  Click **Test**. Jellyseerr will make a few API calls to the bridge. If everything is configured correctly, you will see a "Test Successful" message.
+5.  Save the server configuration.
 
-## API Endpoints
-
-The primary endpoint is for receiving webhooks from Jellyseerr.
-
--   **`POST /webhook/jellyseerr`**
-    -   This endpoint receives the webhook payload from Jellyseerr.
-    -   **Example `curl` command to simulate a webhook:**
-        ```bash
-        curl -X POST http://localhost:8000/webhook/jellyseerr \\
-        -H "Content-Type: application/json" \\
-        -d '{
-              "notification_type": "MEDIA_APPROVED",
-              "media": {
-                "name": "One-Punch Man"
-              },
-              "media_type": "anime",
-              "request": {
-                "seasons": [1]
-              }
-            }'
-        ```
+Now, when you approve an anime request in Jellyseerr, it will automatically be sent to the bridge to start the download.
 
 ## Troubleshooting
 
--   **Authentication Errors (502 Bad Gateway)**: If you see errors related to authentication, double-check that your `DOWNLOADER_USER` and `DOWNLOADER_PASS` in the `.env` file are correct.
--   **Connection Errors**: Ensure the `DOWNLOADER_URL` is correct and that the bridge container is in the same Docker network as the AniWorld-Downloader container.
--   **Anime Not Found (404 Not Found)**: The bridge relies on the title from Jellyseerr. If the downloader's search can't find a match, this error will occur. Try searching for the anime manually in the downloader's UI to see if it's available.
--   **Successful Test Case (Reference)**: The development of this bridge was tested using the following successful case:
-    -   **Action**: A Jellyseerr request for "One Punch Man" Season 1 was approved.
-    -   **Webhook Payload**: Contained `anime_title: "One Punch Man"` and `seasons: [1]`.
-    -   **AniWorld API Calls**:
-        1.  `POST /login` -> Success, session token received.
-        2.  `POST /api/search` with `anime_title: "One Punch Man"` -> Success, series URL found.
-        3.  `POST /api/episodes` with series URL -> Success, list of all episodes returned.
-        4.  `POST /api/download` with URLs for Season 1, `language: German Dub`, `provider: VOE` -> Success, download started.
-    -   **Result**: The downloader reported `COMPLETED 12/12 episodes`.
+-   **"Test Failed" in Jellyseerr**:
+    -   Check that the `jellyseerr-bridge` container is running (`docker-compose ps`).
+    -   Verify that the Hostname, Port, and API Key in Jellyseerr exactly match your `docker-compose.yml` and `.env` file settings.
+    -   Ensure both Jellyseerr and the bridge are on the same Docker network.
+-   **Authentication Errors (502 Bad Gateway from Bridge)**: Check your `DOWNLOADER_USER` and `DOWNLOADER_PASS` credentials.
+-   **Anime Not Found (404 Not Found)**: The anime title from Jellyseerr could not be found by the downloader. Try searching for it manually in the AniWorld-Downloader UI.

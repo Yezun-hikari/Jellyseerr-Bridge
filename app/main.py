@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.routes import webhook
+from app.routes import sonarr
 
 app = FastAPI(
     title="Jellyseerr to AniWorld-Downloader Bridge",
@@ -7,7 +7,7 @@ app = FastAPI(
     version="1.0.0",
 )
 
-app.include_router(webhook.router)
+app.include_router(sonarr.router)
 
 @app.get("/")
 async def root():
