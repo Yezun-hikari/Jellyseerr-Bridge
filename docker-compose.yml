@@ -10,4 +10,8 @@ services:
     env_file:
       - .env
     networks:
-      - jellyfin_default
+      - media-network
+
+networks:
+  media-network:
+    external: true
